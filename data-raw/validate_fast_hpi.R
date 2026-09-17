@@ -105,13 +105,25 @@ set.seed(7)
 d_skew <- data.frame(x = rgamma(200, shape = 2), y = rexp(200) + rnorm(200, sd = 0.3))
 check_kde(d_skew, fast_Hpi2d(d_skew), rep(1, 200), "skewed/heavy-tailed")
 
-# n > ks:::default.bflag()'s ~500 threshold: ks::Hpi()'s own default silently
-# switches to a binned pilot estimate there, which fast_Hpi2d() does not
-# reimplement - it must fall back to plain ks::Hpi() instead of using its
-# fast (always-exact) path. Caught a real bug here once (see git history),
-# so this stays as a permanent regression check.
-cat("\n=== fast_Hpi2d() vs ks::Hpi(), n > 500 (must fall back exactly) ===\n")
-for (n in c(501, 600, 1000, 2000)) {
+# n > ks:::default.bflag()'s ~500 threshold: ks::Hpi()'s own default
+# silently switches to a binned pilot estimate there (a different algorithm,
+# not just a faster path) - fast_Hpi2d() reimplements that too (linear
+# binning via ks:::binning(), unchanged, + FFT convolution via
+# cpp_kfe_isotropic_binned_batch()), matching ks::Hpi()'s choice exactly
+# rather than falling back. Caught two real bugs getting here (see git
+# history): the n > 500 case not being handled at all, and once handled, a
+# missing /n^2 normalization + a placement-offset parity mismatch from R's
+# round-half-to-even round() in the FFT convolution.
+#
+# Note: because psi2r4.mat feeds a BFGS optimizer, even inputs matching to
+# ~1e-14 can occasionally produce an H differing by ~1e-6 to ~1e-7 on
+# numerically ill-conditioned (highly anisotropic) datasets - reproduced
+# with ks's own code alone by perturbing its own psi4 by ~1e-14 and
+# rerunning its own optim() call, so this is inherent BFGS sensitivity, not
+# a sign of a bug. Diffs at that level are expected on some inputs; only
+# diffs much larger than that (like the two bugs above) need investigating.
+cat("\n=== fast_Hpi2d() vs ks::Hpi(), n > 500 (binned path) ===\n")
+for (n in c(501, 600, 1000, 2000, 15000)) {
   set.seed(n)
   d_big <- data.frame(x = rnorm(n), y = 0.4 * rnorm(n) + rnorm(n))
   H_true <- ks::Hpi(d_big)

@@ -219,9 +219,10 @@ create_geom_donutVPC <- function(sim_contours, conf_band = 95, colors_bands = c(
 
     # pooled across all replicates, so n here can be tens of thousands of
     # points tracing contour boundaries rather than a population sample -
-    # outside what fast_Hpi2d() is validated for, so use plain ks::Hpi()
+    # validated against ks::Hpi() on real pooled contour-boundary data (not
+    # just population samples) in data-raw/validate_fast_hpi.R
     kd_sim_full <- fast_kde(sim_full_df[, c("x", "y")],
-                           H = ks::Hpi(sim_full_df[, c("x", "y")]),
+                           H = fast_Hpi2d(sim_full_df[, c("x", "y")]),
                            w = w_scaled,
                            compute.cont = TRUE,
                            approx.cont = FALSE)

@@ -10,21 +10,6 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// cpp_kfe_isotropic
-double cpp_kfe_isotropic(NumericMatrix x, double g, int r1, int r2, bool kfe);
-RcppExport SEXP _pmxcopula_cpp_kfe_isotropic(SEXP xSEXP, SEXP gSEXP, SEXP r1SEXP, SEXP r2SEXP, SEXP kfeSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type x(xSEXP);
-    Rcpp::traits::input_parameter< double >::type g(gSEXP);
-    Rcpp::traits::input_parameter< int >::type r1(r1SEXP);
-    Rcpp::traits::input_parameter< int >::type r2(r2SEXP);
-    Rcpp::traits::input_parameter< bool >::type kfe(kfeSEXP);
-    rcpp_result_gen = Rcpp::wrap(cpp_kfe_isotropic(x, g, r1, r2, kfe));
-    return rcpp_result_gen;
-END_RCPP
-}
 // cpp_kfe_isotropic_batch
 NumericVector cpp_kfe_isotropic_batch(NumericMatrix x, double g, int r, bool kfe);
 RcppExport SEXP _pmxcopula_cpp_kfe_isotropic_batch(SEXP xSEXP, SEXP gSEXP, SEXP rSEXP, SEXP kfeSEXP) {
@@ -36,6 +21,21 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type r(rSEXP);
     Rcpp::traits::input_parameter< bool >::type kfe(kfeSEXP);
     rcpp_result_gen = Rcpp::wrap(cpp_kfe_isotropic_batch(x, g, r, kfe));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_kfe_isotropic_binned_batch
+NumericVector cpp_kfe_isotropic_binned_batch(NumericMatrix counts, NumericVector delta, double g, int r, double n);
+RcppExport SEXP _pmxcopula_cpp_kfe_isotropic_binned_batch(SEXP countsSEXP, SEXP deltaSEXP, SEXP gSEXP, SEXP rSEXP, SEXP nSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type counts(countsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< double >::type g(gSEXP);
+    Rcpp::traits::input_parameter< int >::type r(rSEXP);
+    Rcpp::traits::input_parameter< double >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_kfe_isotropic_binned_batch(counts, delta, g, r, n));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -72,8 +72,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_pmxcopula_cpp_kfe_isotropic", (DL_FUNC) &_pmxcopula_cpp_kfe_isotropic, 5},
     {"_pmxcopula_cpp_kfe_isotropic_batch", (DL_FUNC) &_pmxcopula_cpp_kfe_isotropic_batch, 4},
+    {"_pmxcopula_cpp_kfe_isotropic_binned_batch", (DL_FUNC) &_pmxcopula_cpp_kfe_isotropic_binned_batch, 5},
     {"_pmxcopula_cpp_dmvnorm_mixture_eval", (DL_FUNC) &_pmxcopula_cpp_dmvnorm_mixture_eval, 4},
     {"_pmxcopula_cpp_kde_grid_truncated", (DL_FUNC) &_pmxcopula_cpp_kde_grid_truncated, 7},
     {NULL, NULL, 0}

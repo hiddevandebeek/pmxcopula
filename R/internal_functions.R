@@ -60,17 +60,41 @@ fast_kfe2d <- function(x, g, r) {
   uniq_vals[match(key, ukey)]
 }
 
+#' Kernel functional estimate for an isotropic bivariate normal kernel,
+#' binned
+#'
+#' Same as fast_kfe2d(), but for n above ks:::default.bflag()'s ~500
+#' threshold, where ks:::kfe() itself switches to a binned (linear-binning +
+#' FFT-convolution) estimate instead of the exact O(n^2) sum. The binning
+#' itself (ks:::binning()) is already fast and reused unchanged; only the
+#' kernel-grid evaluation and convolution are done via the Rcpp core
+#' cpp_kfe_isotropic_binned_batch(). Matches ks:::kfe(..., binned = TRUE)'s
+#' output (validated against it in data-raw/validate_fast_hpi.R).
+#'
+#' @noRd
+fast_kfe2d_binned <- function(x, g, r) {
+  bp <- ks:::binning(x, H = g^2 * diag(2))
+  # ks:::kdde.binned.nd() uses sum(bin.par$counts), not nrow(x) - equal for
+  # unweighted data (always the case here) but kept exact regardless.
+  n <- sum(bp$counts)
+  delta <- vapply(bp$eval.points, function(e) (max(e) - min(e)) / (length(e) - 1), numeric(1))
+  ind_mat <- ks:::dmvnorm.deriv(x = rep(0, 2), deriv.order = r, only.index = TRUE, deriv.vec = TRUE)
+  uniq_vals <- cpp_kfe_isotropic_binned_batch(bp$counts, delta, g, r, n)
+  key <- paste(ind_mat[, 1], ind_mat[, 2])
+  ukey <- paste(r - (0:r), 0:r)
+  uniq_vals[match(key, ukey)]
+}
+
 #' Fast bivariate plug-in bandwidth selector
 #'
 #' A faster ks::Hpi(x, nstage = 2, pilot = "samse", pre = "sphere") - its
 #' own default for 2D data. Reuses ks's own pilot-estimation and
 #' optimization code (ks:::gsamse, ks:::invvec, ks:::nur, ...) and only
-#' replaces the O(n^2) kernel functional estimation step with fast_kfe2d().
+#' replaces the kernel functional estimation step - via fast_kfe2d() (exact,
+#' n <= ks:::default.bflag()'s ~500 threshold) or fast_kfe2d_binned()
+#' (binned, above it), matching ks::Hpi()'s own choice there exactly.
 #' Validated against ks::Hpi() in data-raw/validate_fast_hpi.R. Falls back
-#' to plain ks::Hpi() (its own default binned/unbinned choice, unmodified)
-#' for anything not 2D, too few points, or n above ks:::default.bflag()'s
-#' ~500 threshold - above that, ks::Hpi() itself switches to a binned pilot
-#' estimate, which this isotropic Hermite-sum fast path does not replicate.
+#' to plain ks::Hpi() for anything not 2D or too few points.
 #'
 #' @param x A matrix or data.frame with 2 columns.
 #'
@@ -79,17 +103,18 @@ fast_kfe2d <- function(x, g, r) {
 fast_Hpi2d <- function(x) {
   tryCatch({
     x <- as.matrix(x)
-    if (ncol(x) != 2 || nrow(x) < 10 || nrow(x) > 500) stop("fast path only validated for 2D data, n <= 500")
+    if (ncol(x) != 2 || nrow(x) < 10) stop("fast path only validated for 2D data")
 
     n <- nrow(x); d <- 2
+    binned <- ks:::default.bflag(d = 2, n = n)
     x.star <- ks:::pre.sphere(x)
     S12 <- ks:::matrix.sqrt(var(x))
 
     S.star <- var(x.star)
     g6.star <- ks:::gsamse(S.star, n = n, modr = 6)
-    psihat6.star <- fast_kfe2d(x.star, g6.star, 6)
+    psihat6.star <- if (binned) fast_kfe2d_binned(x.star, g6.star, 6) else fast_kfe2d(x.star, g6.star, 6)
     g.star <- ks:::gsamse(S.star, n = n, modr = 4, nstage = 2, psihat = psihat6.star)
-    psihat.star <- fast_kfe2d(x.star, g.star, 4)
+    psihat.star <- if (binned) fast_kfe2d_binned(x.star, g.star, 4) else fast_kfe2d(x.star, g.star, 4)
 
     psi2r4.mat <- ks:::invvec(psihat.star)
     Hstart <- ks::Hns(x = x.star, deriv.order = 0)
