@@ -48,7 +48,7 @@ get_donutVPC <- function(sim_data,
   # contour lines at the target probability levels (e.g. 10th, 50th, 90th when percentiles = c(10, 50, 90))
   obs_contours <- NULL
   for (p in 1:nrow(pairs_matrix)) {
-    kd_obs <- ks::kde(obs_data |> dplyr::select(pairs_matrix[p, ]) |> na.omit(), compute.cont = TRUE)
+    kd_obs <- fast_kde(obs_data |> dplyr::select(pairs_matrix[p, ]) |> na.omit(), compute.cont = TRUE)
     contour_obs <- with(kd_obs, contourLines(x = eval.points[[1]], y = eval.points[[2]],
                                              z = estimate, levels = cont[paste0(100-percentiles,"%")]))
     obs_contours <- rbind.data.frame(obs_contours, extract_contour_df(contour_obs, kd_obs$cont, 0, pairs_matrix[p, ]))
@@ -69,7 +69,8 @@ get_donutVPC <- function(sim_data,
   # (e.g. 2.5th and 97.5th when conf_band = 95), for each percentile-specific contour
   sim_contours_gg <- create_geom_donutVPC(sim_contours = sim_contours,
                                           conf_band = conf_band,
-                                          colors_bands = colors_bands)
+                                          colors_bands = colors_bands,
+                                          cores = cores)
 
   # plot dountVPC(s) for every variable pair
   plot_list <- list()

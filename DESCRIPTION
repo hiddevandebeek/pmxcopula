@@ -28,12 +28,16 @@ Imports:
     gridExtra,
     kde1d (>= 1.1.1),
     ks,
+    mirai,
     patchwork,
+    Rcpp,
     reshape2,
     rlang,
     rvinecopulib,
     sf,
     tibble,
     tidyr
-RoxygenNote: 7.3.3
+LinkingTo:
+    Rcpp
 VignetteBuilder: knitr
+RoxygenNote: 7.3.3
