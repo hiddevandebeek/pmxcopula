@@ -6,6 +6,8 @@
 # regression check to re-run after modifying deriv_sum.cpp/internal_functions.R,
 # or after upgrading the ks package, since fast_Hpi2d()/fast_kde() call
 # several ks:::-prefixed internals that could change between ks versions.
+# Last validated against ks 1.15.1 (see DESCRIPTION's ks (>= 1.15.1) floor -
+# bump both together after re-running this against a newer ks release).
 #
 # All reported diffs should stay at floating-point-noise level (~1e-10 or
 # smaller); anything larger signals a real discrepancy, not rounding.

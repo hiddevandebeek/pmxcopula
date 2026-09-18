@@ -194,20 +194,32 @@ create_geom_donutVPC <- function(sim_contours, conf_band = 95, colors_bands = c(
   colors_bands <- colors_bands[((1:length(percentiles))/2 == round((1:length(percentiles))/2)) + 1] # colors were assigned to the bands depending on the odd or even order of percentiles
   names(colors_bands) <- percentiles
 
-  # one independent (pair, percentile) task per confidence-band polygon
+  # one canonical (pair, percentile) key, used for both the task list below
+  # and the geom lookup further down - was built independently in two
+  # places before, risking a silent NULL lookup if they ever drifted apart
+  task_key <- function(var1, var2, pr) paste0(var1, "-", var2, ": ", pr, "%")
+
+  # one independent (pair, percentile) task per confidence-band polygon,
+  # each carrying only its own pre-filtered rows - sim_contours (the full
+  # pooled data.frame, which the code's own comments note can be tens of
+  # thousands of rows) is split once here instead of every task
+  # independently re-filtering (and, when cores > 1, serializing) the whole
+  # thing
+  sim_contours_split <- split(sim_contours, list(sim_contours$var1, sim_contours$var2, sim_contours$percentile),
+                              sep = "", drop = TRUE)
+
   tasks <- list()
   for (p in 1:nrow(pairs_matrix)) {
     for (pr in percentiles) {
-      var_pair <- paste0(pairs_matrix[p, 1], "-", pairs_matrix[p, 2])
-      tasks[[paste0(var_pair, ": ", pr, "%")]] <- list(var1 = pairs_matrix[p, 1], var2 = pairs_matrix[p, 2], pr = pr)
+      var1 <- pairs_matrix[p, 1]; var2 <- pairs_matrix[p, 2]
+      split_key <- paste(var1, var2, paste0(pr, "%"), sep = "")
+      tasks[[task_key(var1, var2, pr)]] <- list(var1 = var1, var2 = var2, pr = pr, data = sim_contours_split[[split_key]])
     }
   }
 
-  # sim_contours, conf_band are picked up as free variables
+  # conf_band is picked up as a free variable
   compute_polygon <- function(task) {
-    sim_full_df <- sim_contours |>
-      dplyr::filter(var1 == task$var1, var2 == task$var2) |>
-      dplyr::filter(percentile == paste0(task$pr, "%"))
+    sim_full_df <- task$data
 
     # use "weight" to correct
     total <- nrow(sim_full_df)
@@ -241,7 +253,6 @@ create_geom_donutVPC <- function(sim_contours, conf_band = 95, colors_bands = c(
     conf_geom_data <- mirai::mirai_map(
       tasks,
       compute_polygon,
-      sim_contours = sim_contours,
       conf_band = conf_band
     )[.progress]
   } else {
@@ -250,10 +261,11 @@ create_geom_donutVPC <- function(sim_contours, conf_band = 95, colors_bands = c(
 
   contour_geoms <- list()
   for (p in 1:nrow(pairs_matrix)) {
-    var_pair <- paste0(pairs_matrix[p, 1], "-", pairs_matrix[p, 2])
+    var1 <- pairs_matrix[p, 1]; var2 <- pairs_matrix[p, 2]
+    var_pair <- paste0(var1, "-", var2)
     contour_geoms[[var_pair]] <- list()
     for (pr in percentiles) {
-      contour_geoms[[var_pair]][[paste0(pr, "%")]] <- ggplot2::geom_sf(data = conf_geom_data[[paste0(var_pair, ": ", pr, "%")]],
+      contour_geoms[[var_pair]][[paste0(pr, "%")]] <- ggplot2::geom_sf(data = conf_geom_data[[task_key(var1, var2, pr)]],
                                                               color = colors_bands[as.character(pr)], fill = colors_bands[as.character(pr)])
     }
   }

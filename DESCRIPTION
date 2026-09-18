@@ -27,7 +27,7 @@ Imports:
     ggplot2 (>= 3.3.0),
     gridExtra,
     kde1d (>= 1.1.1),
-    ks,
+    ks (>= 1.15.1),
     mirai,
     patchwork,
     Rcpp,
