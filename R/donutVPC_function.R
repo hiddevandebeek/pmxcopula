@@ -21,6 +21,7 @@
 #'
 #' @importFrom combinat combn
 #' @importFrom ks kde
+#' @importFrom mirai daemons everywhere mirai_map
 #' @import dplyr
 #' @import ggplot2
 #'
@@ -43,16 +44,32 @@ get_donutVPC <- function(sim_data,
     stop("variable names in pairs_matrix do not exist in obs_data.")
   }
 
-  # Generate observed contours
-  # For each variable pair, estimate a 2D KDE on obs_data and extract
-  # contour lines at the target probability levels (e.g. 10th, 50th, 90th when percentiles = c(10, 50, 90))
-  obs_contours <- NULL
-  for (p in 1:nrow(pairs_matrix)) {
+  # Generate observed contours - one independent task per variable pair,
+  # estimating a 2D KDE on obs_data and extracting contour lines at the
+  # target probability levels (e.g. 10th, 50th, 90th when
+  # percentiles = c(10, 50, 90)). Previously a plain serial loop, left
+  # unparallelized while every other stage of the pipeline already used
+  # mirai - now dispatched the same way.
+  compute_obs_contour <- function(p) {
     kd_obs <- fast_kde(obs_data |> dplyr::select(pairs_matrix[p, ]) |> na.omit(), compute.cont = TRUE)
     contour_obs <- with(kd_obs, contourLines(x = eval.points[[1]], y = eval.points[[2]],
                                              z = estimate, levels = cont[paste0(100-percentiles,"%")]))
-    obs_contours <- rbind.data.frame(obs_contours, extract_contour_df(contour_obs, kd_obs$cont, 0, pairs_matrix[p, ]))
+    extract_contour_df(contour_obs, kd_obs$cont, 0, pairs_matrix[p, ])
   }
+
+  if (cores > 1) {
+    ensure_daemons(cores)
+    obs_contour_list <- mirai::mirai_map(
+      seq_len(nrow(pairs_matrix)),
+      compute_obs_contour,
+      obs_data = obs_data,
+      percentiles = percentiles,
+      pairs_matrix = pairs_matrix
+    )[.progress]
+  } else {
+    obs_contour_list <- lapply(seq_len(nrow(pairs_matrix)), compute_obs_contour)
+  }
+  obs_contours <- dplyr::bind_rows(obs_contour_list)
 
   # Generate simulated contours
   # For each simulation run (sim_nr) and each variable pair, estimate 2D KDEs
