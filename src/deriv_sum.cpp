@@ -18,6 +18,18 @@ static inline double he(int n, double z) {
   return NA_REAL;
 }
 
+// Fills out[0..r] with He_0(z)..He_r(z) via the standard 3-term recurrence
+// He_{n+1}(z) = z*He_n(z) - n*He_{n-1}(z), instead of r+1 separate calls to
+// he() that each recompute powers of z from scratch. Exact, not an
+// approximation - same values as he(), just fewer flops when several
+// orders are needed for the same z (see cpp_kfe_isotropic_batch()).
+static inline void he_array(int r, double z, double* out) {
+  out[0] = 1.0;
+  if (r == 0) return;
+  out[1] = z;
+  for (int m = 1; m < r; m++) out[m + 1] = z * out[m] - m * out[m - 1];
+}
+
 //' Kernel functional estimate for an isotropic bivariate normal kernel, for
 //' all derivative-index combinations of a given order r at once (r=6 -> 7
 //' combos, r=4 -> 5 combos)
@@ -48,6 +60,7 @@ NumericVector cpp_kfe_isotropic_batch(NumericMatrix x, double g, int r, bool kfe
   const double* x1 = &x(0, 1);
 
   std::vector<double> s(ncombo, 0.0);
+  std::vector<double> heu(ncombo), hev(ncombo);
 
   for (int i = 0; i < n; i++) {
     double xi0 = x0[i], xi1 = x1[i];
@@ -55,15 +68,19 @@ NumericVector cpp_kfe_isotropic_batch(NumericMatrix x, double g, int r, bool kfe
       double u = (xi0 - x0[j]) * invg;
       double v = (xi1 - x1[j]) * invg;
       double expo = std::exp(-0.5 * (u*u + v*v));
+      he_array(r, u, heu.data());
+      he_array(r, v, hev.data());
       for (int k = 0; k < ncombo; k++) {
-        s[k] += he(r - k, u) * he(k, v) * expo;
+        s[k] += heu[r - k] * hev[k] * expo;
       }
     }
   }
 
+  std::vector<double> he0(ncombo);
+  he_array(r, 0.0, he0.data());
   NumericVector total(ncombo);
   for (int k = 0; k < ncombo; k++) {
-    double hm0 = he(r - k, 0.0) * he(k, 0.0);
+    double hm0 = he0[r - k] * he0[k];
     double tot = C * (2.0 * s[k] + (double)n * hm0);
     if (kfe) tot /= ((double)n * (double)n);
     total[k] = tot;
